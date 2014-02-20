@@ -40,7 +40,7 @@ has 'dc_a' => (
 has 'dc_mode' => (
     is => 'rw',
     isa => 'Int',
-    default => 0
+    default => 1
     );
 has 'dc_init' => (
     is => 'rw',
@@ -162,17 +162,19 @@ DSP::LinPred - Linear Prediction
     use LinPred;
 
     # Creating Object.
-    # mu       : Step size
-    # h_length : Filter size
-    # dc_mode  : If set 1,
-    #            it challenges to estimating DC component
+    # mu       : Step size of filter. (default = 0.001)
+    # h_length : Filter size. (default = 100)
+    # dc_mode  : Direct Current Component estimation.
+    #            it challenges to estimating DC component if set 1.
     #            automatically by IIR filter in updating phase.
+    #            (default = 1 enable)
     # dc_init  : Initial DC bias.
-    #            It *MUST* be set value *ACCURATELY* if dc_mode => 0.
-    #            default = 0
-    # dc_a     : Coefficient of IIR filter. untouching is better. default = 0.01
-    # dcd_th   : Convergence threshold value of estimated DC component.
-    #            default = 1
+    #            It *SHOULD* be set value *ACCURATELY* if dc_mode => 0.
+    #            (default = 0)
+    # dc_a     : Coefficient of IIR filter.
+    #            Untouching is better. (default = 0.01)
+    # dcd_th   : Convergence threshold value for DC component estimation.
+    #            (default = 1)
     my $lp = DSP::LinPred->new;
     $lp->set_filter({
                      mu => 0.001,
@@ -194,7 +196,17 @@ DSP::LinPred - Linear Prediction
 
 =head1 DESCRIPTION
 
-LinPred is ...
+DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
+
+This Linear Predicting method can estimate the standard variation, direct current component, and predict future value of input.
+
+=head1 Methods
+
+    $lp->set_filter();
+
+
+
+    $lp->update_predict();
 
 =head1 LICENSE
 
