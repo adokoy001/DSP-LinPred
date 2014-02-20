@@ -1,7 +1,7 @@
 {
-   "abstract" : "It's new $module",
+   "abstract" : "Linear Prediction",
    "author" : [
-      "Toshiaki Yokoda <adokoy001@gmail.com>"
+      "Toshiaki Yokoda <>"
    ],
    "dynamic_config" : 0,
    "generated_by" : "Minilla/v0.11.0, CPAN::Meta::Converter version 2.120921",
@@ -43,6 +43,7 @@
       },
       "runtime" : {
          "requires" : {
+            "Mouse" : "v2.1.0",
             "perl" : "5.008005"
          }
       },
@@ -53,5 +54,8 @@
       }
    },
    "release_status" : "unstable",
-   "version" : "0.01"
+   "version" : "0.01",
+   "x_contributors" : [
+      "Toshiaki_Yokoda <adokoy001@gmail.com>"
+   ]
 }
