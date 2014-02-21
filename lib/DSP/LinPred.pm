@@ -5,6 +5,7 @@ our $VERSION = "0.01";
 
 has 'mu' => (
     is => 'rw',
+    isa => 'Num',
     default => 0.001
     );
 has 'h_length' => (
@@ -14,10 +15,12 @@ has 'h_length' => (
     );
 has 'h' => (
     is => 'rw',
+    isa => 'ArrayRef[Num]',
     default => sub{[(0) x 100]}
     );
 has 'x_stack' => (
     is => 'rw',
+    isa => 'ArrayRef[Num]',
     default => sub{[(0) x 100]}
     );
 has 'x_count' => (
@@ -27,14 +30,17 @@ has 'x_count' => (
     );
 has 'current_error' => (
     is => 'rw',
+    isa => 'Num',
     default => 0
     );
 has 'dc' => (
     is => 'rw',
+    isa => 'Num',
     default => 0
     );
 has 'dc_a' => (
     is => 'rw',
+    isa => 'Num',
     default => 0.01
     );
 has 'dc_mode' => (
@@ -44,11 +50,18 @@ has 'dc_mode' => (
     );
 has 'dc_init' => (
     is => 'rw',
+    isa => 'Num',
     default => 0
     );
 has 'dcd_th' => (
     is => 'rw',
+    isa => 'Num',
     default => 1
+    );
+has 'stddev' => (
+    is => 'rw',
+    isa => 'Num',
+    default => 0
     );
 
 # filter specification
@@ -92,40 +105,6 @@ sub reset_state{
     $self->x_count(0);
 }
 
-# predict and update
-# this method returns estimated value and current error
-sub predict_update{
-    my $self = shift;
-    my $x = shift;
-    my $h_length = $self->h_length;
-    my $h = $self->h;
-    my $x_stack = $self->x_stack;
-    unshift(@$x_stack,$x);
-    pop(@$x_stack);
-    my $dc_diff = abs($self->dc - ($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
-    if(($self->dc_mode == 1) and ($dc_diff > $self->dcd_th)){
-	$self->dc(($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
-    }
-
-    my $x_est = 0;
-    for( my $k = 0; $k <= $#{$h} and $k <= $self->x_count;$k++){
-	$x_est += $h->[$k] * ($x_stack->[$k] - $self->dc);
-    }
-    my $error = $x - ($x_est + $self->dc);
-    $self->current_error($error);
-    my $h_new = $h;
-    for(my $k = 0;$k <= $#{$h} and $k <= $self->x_count; $k++){
-	$h_new->[$k] = 
-	    $h->[$k] 
-	    + $error * $self->mu * ($x_stack->[$k] - $self->dc);
-    }
-
-    $self->h($h_new);
-    $self->x_count($self->x_count + 1);
-
-    return($x_est + $self->dc,$error);
-}
-
 # prediction only
 # predict_num : number of output predicted values
 # this method returns list reference of predicted values
@@ -147,6 +126,50 @@ sub predict{
     }
     return($estimated);
 }
+
+# update only
+# x should be array reference
+sub update{
+    my $self = shift;
+    my $x = shift;
+    my $h_length = $self->h_length;
+    my $h = $self->h;
+    my $x_stack = $self->x_stack;
+
+    for ( my $kx=0; $kx <= $#{$x}; $kx++){
+        unshift(@$x_stack,$x->[$kx]);
+        pop(@$x_stack);
+	if($self->dc_mode == 1){
+	    $self->dce_update($x->[$kx]);
+	}
+
+        my $x_est = 0;
+        for( my $k = 0; $k <= $#{$h} and $k <= $self->x_count;$k++){
+            $x_est += $h->[$k] * ($x_stack->[$k] - $self->dc);
+        }
+        my $error = $x->[$kx] - ($x_est + $self->dc);
+        $self->current_error($error);
+        my $h_new = $h;
+        for(my $k = 0;$k <= $#{$h} and $k <= $self->x_count; $k++){
+            $h_new->[$k] =
+                $h->[$k]
+                + $error * $self->mu * ($x_stack->[$k] - $self->dc);
+        }
+        $self->h($h_new);
+        $self->x_count($self->x_count + 1);
+    }
+}
+
+
+sub dce_update{
+    my $self = shift;
+    my $x = shift;
+    my $dc_diff = abs($self->dc - ($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
+    if($dc_diff > $self->dcd_th){
+        $self->dc(($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
+    }
+}
+
 
 1;
 __END__
@@ -182,11 +205,13 @@ DSP::LinPred - Linear Prediction
                      dc_mode => 0,
                      dc_init => 1
                     });
-    # Updating Filter and Calculating Prediction Error.
-    my $x = [0,0.1, ... ]; # input signal
-    for( 0 .. $#{$x} ){
-        my ($predicted, $error) = $lp->predict_update($x->[$_]);
-    }
+
+    # defining signal x
+    my $x = [0,0.1,0.5, ... ]; # input signal
+
+    # Updating Filter
+    $lp->update($x);
+    my $current_error = $lp->current_error; # get error
 
     # Prediction
     my $num_pred = 10;
@@ -201,12 +226,35 @@ DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
 This Linear Predicting method can estimate the standard variation, direct current component, and predict future value of input.
 
 =head1 Methods
+=head2 I<set_filter>
+I<set_filter> method sets filter specifications to DSP::LinPred object.
 
-    $lp->set_filter();
+    $lp->set_filter(
+        {
+            mu => $step_size, # <Num>
+            h_length => $filter_length, # <Int>
+            h => $initial_filter_state, # <ArrayRef[Num]>
+            dc_init => $initial_dc_bias, # <Num>
+            dc_mode => $dc_estimation, # <Int>, enable when 1
+            dcd_th => $dc_est_threshold # <Num>
+        });
 
 
+=head2 I<update>
+I<update> method updates filter state by source inputs are typed ArrayRef[Num].
+    my $x = [0.13,0.3,-0.2,0.5,-0.07];
+    $lp->update($x);
 
-    $lp->update_predict();
+If you would like to extract the filter state, you can access member variable directly like below.
+
+    my $filter = $lp->h;
+    for( 0 .. $#$filter ){ print $filter->[$_], "\n"; }
+
+=head2 I<predict>
+I<predict> method generates predicted future values of inputs by filter.
+
+    my $predicted = $lp->predict(7);
+    for( 0 .. $#$predicted){ print $predicted->[$_], "\n";}
 
 =head1 LICENSE
 

@@ -27,11 +27,13 @@ DSP::LinPred - Linear Prediction
                      dc_mode => 0,
                      dc_init => 1
                     });
-    # Updating Filter and Calculating Prediction Error.
-    my $x = [0,0.1, ... ]; # input signal
-    for( 0 .. $#{$x} ){
-        my ($predicted, $error) = $lp->predict_update($x->[$_]);
-    }
+
+    # defining signal x
+    my $x = [0,0.1,0.5, ... ]; # input signal
+
+    # Updating Filter
+    $lp->update($x);
+    my $current_error = $lp->current_error; # get error
 
     # Prediction
     my $num_pred = 10;
@@ -45,12 +47,34 @@ DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
 This Linear Predicting method can estimate the standard variation, direct current component, and predict future value of input.
 
 # Methods
+=head2 _set\_filter_
+_set\_filter_ method sets filter specifications to DSP::LinPred object.
 
-    $lp->set_filter();
+    $lp->set_filter(
+        {
+            mu => $step_size, # <Num>
+            h_length => $filter_length, # <Int>
+            h => $initial_filter_state, # <ArrayRef[Num]>
+            dc_init => $initial_dc_bias, # <Num>
+            dc_mode => $dc_estimation, # <Int>, enable when 1
+            dcd_th => $dc_est_threshold # <Num>
+        });
 
+## _update_
+_update_ method updates filter state by source inputs are typed ArrayRef\[Num\].
+    my $x = \[0.13,0.3,-0.2,0.5,-0.07\];
+    $lp->update($x);
 
+If you would like to extract the filter state, you can access member variable directly like below.
 
-    $lp->update_predict();
+    my $filter = $lp->h;
+    for( 0 .. $#$filter ){ print $filter->[$_], "\n"; }
+
+## _predict_
+_predict_ method generates predicted future values of inputs by filter.
+
+    my $predicted = $lp->predict(7);
+    for( 0 .. $#$predicted){ print $predicted->[$_], "\n";}
 
 # LICENSE
 

@@ -14,7 +14,7 @@ my $pred_length = 500;
 my $filter_length = 200;
 my $term = 50;
 my $freq = 1 / $term;
-my $final_error;
+my $orig;
 my $lp = DSP::LinPred->new();
 $lp->set_filter(
     {
@@ -32,12 +32,12 @@ for(my $k=0;$k<$max_iter;$k++){
                 + 0.5*cos(0.5*2*$pi*$freq*$k)
                 - 0.5*cos(0.1*2*$pi*$freq*($k+10))
         ) + $dc;
-    my ($estimate,$error) = $lp->predict_update($x);
-    $final_error = $error;
+    push(@$orig,$x);
 }
-
-cmp_ok($final_error ,'eq', -0.10047807219178, 'METHOD predict_update 1');
-
+$lp->update($orig);
+cmp_ok($lp->current_error ,'eq', -0.10047807219178, 'METHOD update 1');
+my $predicted = $lp->predict(1);
+cmp_ok($predicted->[0], 'eq', 9.97563751600453, 'METHOD predict 2');
 $lp->reset_state;
 $dc_mode = 0;
 $hosei = $dc_mode * $dc;
@@ -50,16 +50,9 @@ $lp->set_filter(
         dcd_th => 2
     }
     );
-for(my $k=0;$k<$max_iter;$k++){
-    my $x =
-        $power*(sin(2*$pi*$freq*$k)
-                + 0.5*cos(0.5*2*$pi*$freq*$k)
-                - 0.5*cos(0.1*2*$pi*$freq*($k+10))
-        ) + $dc;
-    my ($estimate,$error) = $lp->predict_update($x);
-    $final_error = $error;
-}
-cmp_ok($final_error ,'eq', -0.0409088768433552, 'METHOD predict_update 2');
+$lp->update($orig);
+cmp_ok($lp->current_error ,'eq', -0.0409088768433552, 'METHOD update 2');
+cmp_ok($predicted->[0], 'eq', 9.97563751600453, 'METHOD predict 2');
 
 
 done_testing;
