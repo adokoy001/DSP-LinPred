@@ -6,26 +6,28 @@ DSP::LinPred - Linear Prediction
 
     use LinPred;
 
-    # Creating Object.
+    # OPTIONS
     # mu       : Step size of filter. (default = 0.001)
+    #
     # h_length : Filter size. (default = 100)
     # dc_mode  : Direct Current Component estimation.
-    #            it challenges to estimating DC component if set 1.
+    #            it challenges to estimating DC component when set 1.
     #            automatically by IIR filter in updating phase.
     #            (default = 1 enable)
     # dc_init  : Initial DC bias.
-    #            It *SHOULD* be set value *ACCURATELY* if dc_mode => 0.
+    #            It *SHOULD* be set value *ACCURATELY* when dc_mode => 0.
     #            (default = 0)
-    # dc_a     : Coefficient of IIR filter.
-    #            Untouching is better. (default = 0.01)
-    # dcd_th   : Convergence threshold value for DC component estimation.
-    #            (default = 1)
+    #
+    # stddev_mode : Step size correction by stddev of input.
+    #               (default = 1 enable)
+    # stddev_init : Initial value of stddev.
+    #               (default = 1)
     my $lp = DSP::LinPred->new;
     $lp->set_filter({
                      mu => 0.001,
-                     h_length => 100,
-                     dc_mode => 0,
-                     dc_init => 1
+                     filter_length => 500,
+                     dc_mode => 1,
+                     stddev_mode => 1
                     });
 
     # defining signal x
@@ -36,28 +38,28 @@ DSP::LinPred - Linear Prediction
     my $current_error = $lp->current_error; # get error
 
     # Prediction
-    my $num_pred = 10;
-    my $pred = $lp->predict($num_pred);
-    for( 0 .. $#{$pred} ){ print $pred->[$_], "\n"; }
+    my $pred_length = 10;
+    my $pred = $lp->predict($pred_length);
+    for( 0 .. $#$pred ){ print $pred->[$_], "\n"; }
 
 # DESCRIPTION
 
 DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
 
-This Linear Predicting method can estimate the standard variation, direct current component, and predict future value of input.
+This Linear Predicting method can estimate the standard deviation, direct current component, and predict future value of input.
 
-# Methods
+# METHODS
 =head2 _set\_filter_
 _set\_filter_ method sets filter specifications to DSP::LinPred object.
 
     $lp->set_filter(
         {
             mu => $step_size, # <Num>
-            h_length => $filter_length, # <Int>
-            h => $initial_filter_state, # <ArrayRef[Num]>
+            filter_length => $filter_length, # <Int>
             dc_init => $initial_dc_bias, # <Num>
             dc_mode => $dc_estimation, # <Int>, enable when 1
-            dcd_th => $dc_est_threshold # <Num>
+            stddev_init => $initial_stddev, # <Num>
+            stddev_mode => $stddev_estimation # <Int>, enable when 1
         });
 
 ## _update_
@@ -74,7 +76,51 @@ If you would like to extract the filter state, you can access member variable di
 _predict_ method generates predicted future values of inputs by filter.
 
     my $predicted = $lp->predict(7);
-    for( 0 .. $#$predicted){ print $predicted->[$_], "\n";}
+    for( 0 .. $#$predicted ){ print $predicted->[$_], "\n";}
+
+## _filter\_dc_
+This method can calculate mean value of current filter.
+
+    my $filter_dc = $lp->filter_dc;
+
+## _filter\_stddev_
+This method can calculate standard deviation of current filter.
+
+    my $filter_stddev = $lp->filter_stddev;
+
+# READING STATES
+
+## _current\_error_
+
+    # It returns value of current prediction error
+    # error = Actual - Predicted
+    my $current_error = $lp->current_error;
+    print 'Current Error : '.$current_error, "\n";
+
+## _h_
+
+    # It returns filter state(ArrayRef)
+    my $filter = $lp->h;
+    print "Filter state\n";
+    for( 0 .. $#$filter ){ print $_.' : '.$filter->[$_],"\n"; }
+
+## _x\_count_
+
+    # It returns value of input counter used in filter updating.
+    my $x_count = $lp->x_count;
+    print 'Input count : '.$x_count, "\n";
+
+## _dc_
+
+    # Get value of current Direct Current Components of inputs.
+    my $dc = $lp->dc;
+    print 'Current DC-Component : '.$dc, "\n";
+
+## _stddev_
+
+    # Get value of current standard deviation of inputs.
+    my $stddev = $lp->dc;
+    print 'Current STDDEV : '.$stddev, "\n";
 
 # LICENSE
 

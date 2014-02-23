@@ -38,11 +38,6 @@ has 'dc' => (
     isa => 'Num',
     default => 0
     );
-has 'dc_a' => (
-    is => 'rw',
-    isa => 'Num',
-    default => 0.01
-    );
 has 'dc_mode' => (
     is => 'rw',
     isa => 'Int',
@@ -53,16 +48,24 @@ has 'dc_init' => (
     isa => 'Num',
     default => 0
     );
-has 'dcd_th' => (
-    is => 'rw',
-    isa => 'Num',
-    default => 1
-    );
 has 'stddev' => (
     is => 'rw',
     isa => 'Num',
     default => 0
     );
+has 'stddev_mode' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 1
+    );
+has 'stddev_init' => (
+    is => 'rw',
+    isa => 'Num',
+    default => 1
+    );
+
+
+
 
 # filter specification
 # mu : step size
@@ -70,8 +73,8 @@ has 'stddev' => (
 sub set_filter{
     my $self = shift;
     my $conf = shift;
-    if(defined($conf->{mu})){
-	$self->mu($conf->{mu});
+    if(defined($conf->{mu_mode})){
+        $self->mu_mode($conf->{mu_mode});
     }
     if(defined($conf->{filter_length})){
 	$self->h_length($conf->{filter_length});
@@ -89,8 +92,12 @@ sub set_filter{
 	$self->dc($conf->{dc_init});
 	$self->dc_init($conf->{dc_init});
     }
-    if(defined($conf->{dcd_th})){
-	$self->dcd_th($conf->{dcd_th});
+    if(defined($conf->{stddev_mode})){
+        $self->stddev_mode($conf->{stddev_mode});
+    }
+    if(defined($conf->{stddev_init})){
+        $self->stddev($conf->{stddev_init});
+        $self->stddev_init($conf->{stddev_init});
     }
 }
 
@@ -103,6 +110,7 @@ sub reset_state{
     $self->current_error(0);
     $self->dc($self->dc_init);
     $self->x_count(0);
+    $self->stddev($self->stddev_init);
 }
 
 # prediction only
@@ -129,6 +137,7 @@ sub predict{
 
 # update only
 # x should be array reference
+
 sub update{
     my $self = shift;
     my $x = shift;
@@ -137,38 +146,92 @@ sub update{
     my $x_stack = $self->x_stack;
 
     for ( my $kx=0; $kx <= $#{$x}; $kx++){
-        unshift(@$x_stack,$x->[$kx]);
-        pop(@$x_stack);
+	unshift(@$x_stack,$x->[$kx]);
+	pop(@$x_stack);
+	$self->x_count($self->x_count + 1);
 	if($self->dc_mode == 1){
-	    $self->dce_update($x->[$kx]);
+	    $self->dc_update;
+	}
+	if($self->stddev_mode == 1){
+	    $self->stddev_update;
+	}
+	my $x_est = 0;
+	for( my $k = 0; $k <= $#{$h} and $k <= $self->x_count;$k++){
+	    $x_est += $h->[$k] * ($x_stack->[$k] - $self->dc);
+	}
+	my $error = $x->[$kx] - ($x_est + $self->dc);
+	$self->current_error($error);
+	my $h_new = $h;
+	my $tmp_coef = 1;
+	if($self->stddev_mode == 1){
+	    $tmp_coef = $self->mu * $error / (0.866 * $self->stddev);
+	}else{
+	    $tmp_coef = $self->mu * $error;
 	}
 
-        my $x_est = 0;
-        for( my $k = 0; $k <= $#{$h} and $k <= $self->x_count;$k++){
-            $x_est += $h->[$k] * ($x_stack->[$k] - $self->dc);
-        }
-        my $error = $x->[$kx] - ($x_est + $self->dc);
-        $self->current_error($error);
-        my $h_new = $h;
-        for(my $k = 0;$k <= $#{$h} and $k <= $self->x_count; $k++){
-            $h_new->[$k] =
-                $h->[$k]
-                + $error * $self->mu * ($x_stack->[$k] - $self->dc);
-        }
-        $self->h($h_new);
-        $self->x_count($self->x_count + 1);
+	for(my $k = 0;$k <= $#{$h} and $k <= $self->x_count; $k++){
+	    $h_new->[$k] = 
+		$h->[$k] 
+		+ $tmp_coef * ($x_stack->[$k] - $self->dc);
+	}
+	$self->h($h_new);
     }
 }
 
+## DC component calculation and update
+# using x_stack
 
-sub dce_update{
+sub dc_update{
     my $self = shift;
-    my $x = shift;
-    my $dc_diff = abs($self->dc - ($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
-    if($dc_diff > $self->dcd_th){
-        $self->dc(($x - $self->dc * $self->dc_a)/(1 - $self->dc_a));
+    my $x_stack = $self->x_stack;
+    my $mean = 0;
+    my $num = $#$x_stack + 1;
+    for(0 .. $#$x_stack){
+        $mean += $x_stack->[$_];
     }
+    $mean = $mean / $num;
+    $self->dc($mean);
+    #print $self->dc,"\n";
 }
+
+## standard deviation calculation and update
+sub stddev_update{
+    my $self = shift;
+    my $x_stack = $self->x_stack;
+    my $variance = 0;
+    my $num = $#$x_stack + 1;
+    for(0 .. $#$x_stack){
+        $variance += ($x_stack->[$_] - $self->dc)**2;
+    }
+    $variance = $variance / $num;
+    $self->stddev(sqrt($variance));
+    #print $self->stddev, "\n";
+}
+
+## calculation of mean value of filter
+sub filter_dc{
+    my $self = shift;
+    my $h = $self->h;
+    my $mean = 0;
+    my $num = $#$h + 1;
+    for(0 .. $#$h){
+        $mean += $h->[$_];
+    }
+    return(sqrt($mean / $num));
+}
+
+## calculation of stddev of filter
+sub filter_stddev{
+    my $self = shift;
+    my $h = $self->h;
+    my $variance = 0;
+    my $num = $#$h + 1;
+    for(0 .. $#$h){
+        $variance += ($h->[$_])**2;
+    }
+    return(sqrt($variance / $num));
+}
+
 
 
 1;
@@ -184,26 +247,28 @@ DSP::LinPred - Linear Prediction
 
     use LinPred;
 
-    # Creating Object.
+    # OPTIONS
     # mu       : Step size of filter. (default = 0.001)
+    #
     # h_length : Filter size. (default = 100)
     # dc_mode  : Direct Current Component estimation.
-    #            it challenges to estimating DC component if set 1.
+    #            it challenges to estimating DC component when set 1.
     #            automatically by IIR filter in updating phase.
     #            (default = 1 enable)
     # dc_init  : Initial DC bias.
-    #            It *SHOULD* be set value *ACCURATELY* if dc_mode => 0.
+    #            It *SHOULD* be set value *ACCURATELY* when dc_mode => 0.
     #            (default = 0)
-    # dc_a     : Coefficient of IIR filter.
-    #            Untouching is better. (default = 0.01)
-    # dcd_th   : Convergence threshold value for DC component estimation.
-    #            (default = 1)
+    #
+    # stddev_mode : Step size correction by stddev of input.
+    #               (default = 1 enable)
+    # stddev_init : Initial value of stddev.
+    #               (default = 1)
     my $lp = DSP::LinPred->new;
     $lp->set_filter({
                      mu => 0.001,
-                     h_length => 100,
-                     dc_mode => 0,
-                     dc_init => 1
+                     filter_length => 500,
+                     dc_mode => 1,
+                     stddev_mode => 1
                     });
 
     # defining signal x
@@ -214,29 +279,29 @@ DSP::LinPred - Linear Prediction
     my $current_error = $lp->current_error; # get error
 
     # Prediction
-    my $num_pred = 10;
-    my $pred = $lp->predict($num_pred);
-    for( 0 .. $#{$pred} ){ print $pred->[$_], "\n"; }
+    my $pred_length = 10;
+    my $pred = $lp->predict($pred_length);
+    for( 0 .. $#$pred ){ print $pred->[$_], "\n"; }
 
 
 =head1 DESCRIPTION
 
 DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
 
-This Linear Predicting method can estimate the standard variation, direct current component, and predict future value of input.
+This Linear Predicting method can estimate the standard deviation, direct current component, and predict future value of input.
 
-=head1 Methods
+=head1 METHODS
 =head2 I<set_filter>
 I<set_filter> method sets filter specifications to DSP::LinPred object.
 
     $lp->set_filter(
         {
             mu => $step_size, # <Num>
-            h_length => $filter_length, # <Int>
-            h => $initial_filter_state, # <ArrayRef[Num]>
+            filter_length => $filter_length, # <Int>
             dc_init => $initial_dc_bias, # <Num>
             dc_mode => $dc_estimation, # <Int>, enable when 1
-            dcd_th => $dc_est_threshold # <Num>
+            stddev_init => $initial_stddev, # <Num>
+            stddev_mode => $stddev_estimation # <Int>, enable when 1
         });
 
 
@@ -254,7 +319,52 @@ If you would like to extract the filter state, you can access member variable di
 I<predict> method generates predicted future values of inputs by filter.
 
     my $predicted = $lp->predict(7);
-    for( 0 .. $#$predicted){ print $predicted->[$_], "\n";}
+    for( 0 .. $#$predicted ){ print $predicted->[$_], "\n";}
+
+=head2 I<filter_dc>
+This method can calculate mean value of current filter.
+
+    my $filter_dc = $lp->filter_dc;
+
+=head2 I<filter_stddev>
+This method can calculate standard deviation of current filter.
+
+    my $filter_stddev = $lp->filter_stddev;
+
+
+=head1 READING STATES
+
+=head2 I<current_error>
+
+    # It returns value of current prediction error
+    # error = Actual - Predicted
+    my $current_error = $lp->current_error;
+    print 'Current Error : '.$current_error, "\n";
+
+=head2 I<h>
+
+    # It returns filter state(ArrayRef)
+    my $filter = $lp->h;
+    print "Filter state\n";
+    for( 0 .. $#$filter ){ print $_.' : '.$filter->[$_],"\n"; }
+
+=head2 I<x_count>
+
+    # It returns value of input counter used in filter updating.
+    my $x_count = $lp->x_count;
+    print 'Input count : '.$x_count, "\n";
+
+=head2 I<dc>
+
+    # Get value of current Direct Current Components of inputs.
+    my $dc = $lp->dc;
+    print 'Current DC-Component : '.$dc, "\n";
+
+=head2 I<stddev>
+
+    # Get value of current standard deviation of inputs.
+    my $stddev = $lp->dc;
+    print 'Current STDDEV : '.$stddev, "\n";
 
 =head1 LICENSE
 
