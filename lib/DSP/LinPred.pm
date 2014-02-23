@@ -291,6 +291,7 @@ DSP::LinPred is Linear Prediction by Least Mean Squared Algorithm.
 This Linear Predicting method can estimate the standard deviation, direct current component, and predict future value of input.
 
 =head1 METHODS
+
 =head2 I<set_filter>
 I<set_filter> method sets filter specifications to DSP::LinPred object.
 
