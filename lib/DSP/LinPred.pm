@@ -1,7 +1,7 @@
 package DSP::LinPred;
 use 5.008005;
 use Mouse;
-our $VERSION = "0.01";
+our $VERSION = "0.03";
 
 has 'mu' => (
     is => 'rw',
@@ -245,7 +245,7 @@ DSP::LinPred - Linear Prediction
 
 =head1 SYNOPSIS
 
-    use LinPred;
+    use DSP::LinPred;
 
     # OPTIONS
     # mu       : Step size of filter. (default = 0.001)
@@ -263,7 +263,10 @@ DSP::LinPred - Linear Prediction
     #               (default = 1 enable)
     # stddev_init : Initial value of stddev.
     #               (default = 1)
+
     my $lp = DSP::LinPred->new;
+
+    # set filter
     $lp->set_filter({
                      mu => 0.001,
                      filter_length => 500,
@@ -293,6 +296,7 @@ This Linear Predicting method can estimate the standard deviation, direct curren
 =head1 METHODS
 
 =head2 I<set_filter>
+
 I<set_filter> method sets filter specifications to DSP::LinPred object.
 
     $lp->set_filter(
@@ -307,6 +311,7 @@ I<set_filter> method sets filter specifications to DSP::LinPred object.
 
 
 =head2 I<update>
+
 I<update> method updates filter state by source inputs are typed ArrayRef[Num].
     my $x = [0.13,0.3,-0.2,0.5,-0.07];
     $lp->update($x);
@@ -317,17 +322,20 @@ If you would like to extract the filter state, you can access member variable di
     for( 0 .. $#$filter ){ print $filter->[$_], "\n"; }
 
 =head2 I<predict>
+
 I<predict> method generates predicted future values of inputs by filter.
 
     my $predicted = $lp->predict(7);
     for( 0 .. $#$predicted ){ print $predicted->[$_], "\n";}
 
 =head2 I<filter_dc>
+
 This method can calculate mean value of current filter.
 
     my $filter_dc = $lp->filter_dc;
 
 =head2 I<filter_stddev>
+
 This method can calculate standard deviation of current filter.
 
     my $filter_stddev = $lp->filter_stddev;

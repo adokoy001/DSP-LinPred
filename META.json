@@ -54,7 +54,7 @@
       }
    },
    "release_status" : "unstable",
-   "version" : "0.01",
+   "version" : "0.03",
    "x_contributors" : [
       "yokoda <yokoda@ub12.04svr>",
       "Toshiaki_Yokoda <adokoy001@gmail.com>"
