@@ -76,7 +76,7 @@ has 'iir_mode' => (
 has 'iir_a' => (
     is => 'rw',
     isa => 'Num',
-    default => 0.001
+    default => 0.01
     );
 
 
@@ -103,6 +103,11 @@ sub set_filter{
 	    $self->x_stack([($conf->{dc_init}) x $conf->{filter_length}]);
 	}else{
 	    $self->x_stack([(0) x $conf->{filter_length}]);
+	}
+	if(defined($conf->{iir_a})){
+	    $self->iir_a($conf->{iir_a});
+	}else{
+	    $self->iir_a(1 / $conf->{filter_length})
 	}
     }
     if(defined($conf->{dc_mode})){
@@ -228,7 +233,8 @@ sub dc_update{
 sub dc_update_iir{
     my $self = shift;
     my $x = shift;
-    $self->dc(($x - $self->dc * $self->iir_a)/(1 - $self->iir_a));
+    my $new_dc = ($x - $self->dc * $self->iir_a)/(1 - $self->iir_a);
+    $self->dc($new_dc);
 }
 
 
@@ -249,8 +255,9 @@ sub stddev_update{
 sub stddev_update_iir{
     my $self = shift;
     my $x = shift;
-    my $diff = abs($x - $self->dc);
-    $self->stddev(($diff - $self->stddev * $self->iir_a)/(1 - $self->iir_a));
+    my $tmp = sqrt(($x - $self->dc)**2);
+    my $new_stddev = ($tmp - $self->stddev * $self->iir_a)/(1 - $self->iir_a);
+    $self->stddev($new_stddev);
 }
 
 ## calculation of mean value of filter
@@ -262,7 +269,7 @@ sub filter_dc{
     for(0 .. $#$h){
         $mean += $h->[$_];
     }
-    return(sqrt($mean / $num));
+    return($mean / $num);
 }
 
 ## calculation of stddev of filter
@@ -297,8 +304,7 @@ DSP::LinPred - Linear Prediction
     #
     # h_length : Filter size. (default = 100)
     # dc_mode  : Direct Current Component estimation.
-    #            it challenges to estimating DC component when set 1
-    #            automatically in updating phase.
+    #            it challenges to estimating DC component when set 1.
     #            (default = 1 enable)
     # dc_init  : Initial DC bias.
     #            It *SHOULD* be set value *ACCURATELY* when dc_mode => 0.
@@ -309,10 +315,6 @@ DSP::LinPred - Linear Prediction
     # stddev_init : Initial value of stddev.
     #               (default = 1)
     #
-    # iir_mode : Estimation of dc and stddev by using IIR filter.
-    #            (default = 0 disable)
-    # iir_a    : IIR filter coefficient.
-    #          : (default = 0.001)
 
     my $lp = DSP::LinPred->new;
 
