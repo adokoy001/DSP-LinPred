@@ -59,7 +59,7 @@
          "url" : "ssh://git://kumaosan-web2.com/45000/home/yokoda/repos/my_projects/DSP-LinPred.git"
       }
    },
-   "version" : "0.04",
+   "version" : "0.05",
    "x_contributors" : [
       "Toshiaki_Yokoda <adokoy001@gmail.com>",
       "yokoda <yokoda@ub12.04svr>"

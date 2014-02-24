@@ -1,12 +1,17 @@
 package DSP::LinPred;
 use 5.008005;
 use Mouse;
-our $VERSION = "0.04";
+our $VERSION = "0.05";
 
 has 'mu' => (
     is => 'rw',
     isa => 'Num',
     default => 0.001
+    );
+has 'mu_mode' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 0
     );
 has 'h_length' => (
     is => 'rw',
@@ -63,7 +68,16 @@ has 'stddev_init' => (
     isa => 'Num',
     default => 1
     );
-
+has 'iir_mode' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 0
+    );
+has 'iir_a' => (
+    is => 'rw',
+    isa => 'Num',
+    default => 0.001
+    );
 
 
 
@@ -75,6 +89,12 @@ sub set_filter{
     my $conf = shift;
     if(defined($conf->{mu_mode})){
         $self->mu_mode($conf->{mu_mode});
+    }
+    if(defined($conf->{iir_mode})){
+        $self->iir_mode($conf->{iir_mode});
+    }
+    if(defined($conf->{iir_a})){
+        $self->iir_a($conf->{iir_a});
     }
     if(defined($conf->{filter_length})){
 	$self->h_length($conf->{filter_length});
@@ -150,10 +170,18 @@ sub update{
 	pop(@$x_stack);
 	$self->x_count($self->x_count + 1);
 	if($self->dc_mode == 1){
-	    $self->dc_update;
+	    if($self->iir_mode == 1){
+		$self->dc_update_iir($x->[$kx]);
+	    }else{
+		$self->dc_update;
+	    }
 	}
 	if($self->stddev_mode == 1){
-	    $self->stddev_update;
+	    if($self->iir_mode == 1){
+		$self->stddev_update_iir($x->[$kx]);
+	    }else{
+		$self->stddev_update;
+	    }
 	}
 	my $x_est = 0;
 	for( my $k = 0; $k <= $#{$h} and $k <= $self->x_count;$k++){
@@ -164,9 +192,12 @@ sub update{
 	my $h_new = $h;
 	my $tmp_coef = 1;
 	if($self->stddev_mode == 1){
-	    $tmp_coef = $self->mu * $error / (0.866 * $self->stddev);
+	    $tmp_coef = $self->mu * $error / (1 + $self->stddev);
 	}else{
 	    $tmp_coef = $self->mu * $error;
+	}
+	if($self->mu_mode == 1){
+	    $tmp_coef = 10 * $self->mu / (1 + $self->h_length);
 	}
 
 	for(my $k = 0;$k <= $#{$h} and $k <= $self->x_count; $k++){
@@ -191,8 +222,15 @@ sub dc_update{
     }
     $mean = $mean / $num;
     $self->dc($mean);
-    #print $self->dc,"\n";
 }
+
+## update by IIR
+sub dc_update_iir{
+    my $self = shift;
+    my $x = shift;
+    $self->dc(($x - $self->dc * $self->iir_a)/(1 - $self->iir_a));
+}
+
 
 ## standard deviation calculation and update
 sub stddev_update{
@@ -205,7 +243,14 @@ sub stddev_update{
     }
     $variance = $variance / $num;
     $self->stddev(sqrt($variance));
-    #print $self->stddev, "\n";
+}
+
+## update by IIR
+sub stddev_update_iir{
+    my $self = shift;
+    my $x = shift;
+    my $diff = abs($x - $self->dc);
+    $self->stddev(($diff - $self->stddev * $self->iir_a)/(1 - $self->iir_a));
 }
 
 ## calculation of mean value of filter
@@ -252,8 +297,8 @@ DSP::LinPred - Linear Prediction
     #
     # h_length : Filter size. (default = 100)
     # dc_mode  : Direct Current Component estimation.
-    #            it challenges to estimating DC component when set 1.
-    #            automatically by IIR filter in updating phase.
+    #            it challenges to estimating DC component when set 1
+    #            automatically in updating phase.
     #            (default = 1 enable)
     # dc_init  : Initial DC bias.
     #            It *SHOULD* be set value *ACCURATELY* when dc_mode => 0.
@@ -263,6 +308,11 @@ DSP::LinPred - Linear Prediction
     #               (default = 1 enable)
     # stddev_init : Initial value of stddev.
     #               (default = 1)
+    #
+    # iir_mode : Estimation of dc and stddev by using IIR filter.
+    #            (default = 0 disable)
+    # iir_a    : IIR filter coefficient.
+    #          : (default = 0.001)
 
     my $lp = DSP::LinPred->new;
 
