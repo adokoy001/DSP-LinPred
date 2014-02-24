@@ -1,7 +1,7 @@
 package DSP::LinPred;
 use 5.008005;
 use Mouse;
-our $VERSION = "0.03";
+our $VERSION = "0.04";
 
 has 'mu' => (
     is => 'rw',
@@ -313,6 +313,7 @@ I<set_filter> method sets filter specifications to DSP::LinPred object.
 =head2 I<update>
 
 I<update> method updates filter state by source inputs are typed ArrayRef[Num].
+
     my $x = [0.13,0.3,-0.2,0.5,-0.07];
     $lp->update($x);
 

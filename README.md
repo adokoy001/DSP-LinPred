@@ -70,7 +70,8 @@ _set\_filter_ method sets filter specifications to DSP::LinPred object.
 ## _update_
 
 _update_ method updates filter state by source inputs are typed ArrayRef\[Num\].
-    my $x = \[0.13,0.3,-0.2,0.5,-0.07\];
+
+    my $x = [0.13,0.3,-0.2,0.5,-0.07];
     $lp->update($x);
 
 If you would like to extract the filter state, you can access member variable directly like below.
