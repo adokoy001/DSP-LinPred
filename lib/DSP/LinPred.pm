@@ -1,7 +1,7 @@
 package DSP::LinPred;
 use 5.008005;
 use Mouse;
-our $VERSION = "0.05";
+our $VERSION = "0.06";
 
 has 'mu' => (
     is => 'rw',
@@ -427,6 +427,29 @@ This method can calculate standard deviation of current filter.
     # Get value of current standard deviation of inputs.
     my $stddev = $lp->dc;
     print 'Current STDDEV : '.$stddev, "\n";
+
+=head1 EXPERIMENTAL OPTIONS
+
+=head2 I<iir_mode> and I<iir_a>
+
+In I<set_filter> option.
+if set iir_mode to 1, and iir_a, it challenges to calculate DC value and stddev by using IIR filter.
+
+IIR spec: 
+next_dc = (current_input - iir_a * current_dc) / (1 - iir_a)
+
+next_stddev = (abs(current_input - current_dc) - iir_a * current_stddev) / (1 - iir_a)
+
+    # set_filter with iir_mode on.
+    $lp->set_filter({
+                     mu => 0.001,
+                     filter_length => 500,
+                     dc_mode => 1,
+                     stddev_mode => 1,
+                     iir_mode => 1,
+                     iir_a => 0.01
+                    });
+
 
 =head1 LICENSE
 
